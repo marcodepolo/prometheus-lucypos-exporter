@@ -136,6 +136,8 @@ func (e *Exporter) collectDbAudit(ch chan<- prometheus.Metric) error {
 
 func (e *Exporter) collect(ch chan<- prometheus.Metric) error {
 
+    log.Infof("Starting collecting metrics")
+
     if err := e.collectBackup(ch); err != nil {
         return err
     }
@@ -149,6 +151,9 @@ func (e *Exporter) collect(ch chan<- prometheus.Metric) error {
 }
 
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
+
+    log.Infof("Locking mutex")
+
     e.mutex.Lock() // To protect metrics from concurrent collects.
     defer e.mutex.Unlock()
     if err := e.collect(ch); err != nil {
@@ -163,7 +168,7 @@ func main() {
     exporter := NewExporter(*backupDirectoryPath, *mysqlConnection)
     prometheus.MustRegister(exporter)
 
-    log.Infof("Starting Server: %s", *listeningAddress)
+    log.Infof("Starting ********** Server: %s", *listeningAddress)
     http.Handle(*metricsEndpoint, prometheus.Handler())
     log.Fatal(http.ListenAndServe(*listeningAddress, nil))
 }
