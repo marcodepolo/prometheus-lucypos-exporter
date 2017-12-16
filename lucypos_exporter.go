@@ -136,6 +136,8 @@ func (e *Exporter) collectDbAudit(ch chan<- prometheus.Metric) error {
 
 func (e *Exporter) collect(ch chan<- prometheus.Metric) error {
 
+    log.Infof("Starting collecting metrics")
+
     if err := e.collectBackup(ch); err != nil {
         return err
     }
