@@ -168,7 +168,7 @@ func main() {
     exporter := NewExporter(*backupDirectoryPath, *mysqlConnection)
     prometheus.MustRegister(exporter)
 
-    log.Infof("Starting ********** Server: %s", *listeningAddress)
+    log.Infof("Starting Server: %s", *listeningAddress)
     http.Handle(*metricsEndpoint, prometheus.Handler())
     log.Fatal(http.ListenAndServe(*listeningAddress, nil))
 }
