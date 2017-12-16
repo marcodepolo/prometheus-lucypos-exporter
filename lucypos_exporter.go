@@ -1,5 +1,9 @@
 package main
 
+//
+// Exposes monitoring metrics of LucyPOS to Prometheus
+//
+
 import (
     "flag"
     "fmt"
@@ -58,6 +62,8 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func NewExporter(backupDirectoryPath string, mysqlConnection string) *Exporter {
+
+    //Declare metrics that will be exposed to prometheus
     return &Exporter{
         BackupDirectoryPath: backupDirectoryPath,
         MysqlConnection: mysqlConnection,
@@ -67,14 +73,14 @@ func NewExporter(backupDirectoryPath string, mysqlConnection string) *Exporter {
             []string{"name"},
             nil),
         lastAudit:  prometheus.NewDesc(
-            prometheus.BuildFQName(namespace, "", "last_audit"),
+            prometheus.BuildFQName(namespace, "", "last_audit_timestamp"),
             "Rows sync in mysql",
-            []string{"rows"},
+            []string{"name"},
             nil),
     }
 }
 
-func (e *Exporter) collect(ch chan<- prometheus.Metric) error {
+func (e *Exporter) collectBackup(ch chan<- prometheus.Metric) error {
 
     files, err := ioutil.ReadDir(e.BackupDirectoryPath)
     if err != nil {
@@ -82,6 +88,7 @@ func (e *Exporter) collect(ch chan<- prometheus.Metric) error {
         return fmt.Errorf("Error opening backup file: %v", err)
     }
 
+    //get the last modified file in the directory
     sort.Sort(byModTime(files))
 
     size := files[0].Size()
@@ -93,32 +100,52 @@ func (e *Exporter) collect(ch chan<- prometheus.Metric) error {
 
     ch <- prometheus.MustNewConstMetric(e.backupSize, prometheus.CounterValue, val, label)
 
+    return nil;
+}
+
+func (e *Exporter) collectDbAudit(ch chan<- prometheus.Metric) error {
+
     db, err := sql.Open("mysql", e.MysqlConnection)
     if err != nil {
-        ch <- prometheus.MustNewConstMetric(e.lastAudit, prometheus.CounterValue, 0, "Sync Rows")
+        ch <- prometheus.MustNewConstMetric(e.lastAudit, prometheus.CounterValue, 0, "audit")
         return fmt.Errorf("Error connecting to mysql: %v", err)
     }
     defer db.Close()
 
     stmtOut, err := db.Prepare("SELECT UNIX_TIMESTAMP(max(time)) FROM audit")
     if err != nil {
-        ch <- prometheus.MustNewConstMetric(e.lastAudit, prometheus.CounterValue, 0, "Sync Rows")
-        return fmt.Errorf("Error preparing ********* query to mysql: %v", err)
+        ch <- prometheus.MustNewConstMetric(e.lastAudit, prometheus.CounterValue, 0, "audit")
+        return fmt.Errorf("Error preparing query to mysql: %v", err)
     }
     defer stmtOut.Close()
 
     var lastAudit float64
     err = stmtOut.QueryRow().Scan(&lastAudit)
     if err != nil {
-        ch <- prometheus.MustNewConstMetric(e.lastAudit, prometheus.CounterValue, 0, "Sync Rows")
+        ch <- prometheus.MustNewConstMetric(e.lastAudit, prometheus.CounterValue, 0, "audit")
         return fmt.Errorf("Error querying mysql: %v", err)
     }
 
     log.Infof("Collected Metric %s", lastAudit)
 
-    ch <- prometheus.MustNewConstMetric(e.lastAudit, prometheus.CounterValue, lastAudit, "Sync Rows")
+    ch <- prometheus.MustNewConstMetric(e.lastAudit, prometheus.CounterValue, lastAudit, "audit")
 
     return nil
+
+}
+
+func (e *Exporter) collect(ch chan<- prometheus.Metric) error {
+
+    if err := e.collectBackup(ch); err != nil {
+        return err
+    }
+
+    if err := e.collectDbAudit(ch); err != nil {
+        return err
+    }
+
+    return nil;
+
 }
 
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
@@ -132,7 +159,6 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 func main() {
     flag.Parse()
-    log.Infof("BACKUP ********** MAIN")
 
     exporter := NewExporter(*backupDirectoryPath, *mysqlConnection)
     prometheus.MustRegister(exporter)

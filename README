@@ -1,0 +1,11 @@
+Prometheus exporter for LucyPOS
+
+### Requirement
+
+go >= 1.7
+
+### Build
+
+1. export GOTPATH & GOBIN to the directory of this repo
+
+2. go install lucypos_exporter.go
