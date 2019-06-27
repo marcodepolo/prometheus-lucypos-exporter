@@ -2,7 +2,7 @@ Prometheus exporter for LucyPOS
 
 ### Requirement
 
-go >= 1.7
+go 1.10
 
 ### Build
 
