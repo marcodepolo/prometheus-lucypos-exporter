@@ -1,7 +1,7 @@
 package main
 
 //
-// Exposes monitoring metrics of LucyPOS to Prometheus
+// Exposes monitoring metrics of LucyPOS to Prometheus.
 //
 
 import (
