@@ -131,19 +131,19 @@ func (e *Exporter) collectBackup(ch chan<- prometheus.Metric) error {
             fmt.Println(file.Name())
             break
           }
-		  log.Infof("-regular file ")
+		  promlog.Infof("-regular file ")
       }
       i = i+1
     }
     // debug exception if no backup file at all
-    log.Infof("i is %s ", i)
+    promlog.Infof("i is %s ", i)
       
     size := files[i].Size()
     label := files[i].Name()
 
     val := float64(size)
 
-    log.Infof("Last backup is %s with size ", label, val)
+    promlog.Infof("Last backup is %s with size ", label, val)
 
     ch <- prometheus.MustNewConstMetric(e.backupSize, prometheus.CounterValue, val, label)
 
@@ -181,7 +181,7 @@ func (e *Exporter) collectBackupDate(ch chan<- prometheus.Metric) error {
     
 // switched off this comment as could be guilty of halting the container with unkown char error
 // error from daemon in stream: Error grabbing logs: invalid character '\x00' looking for beginning of value
-//    log.Infof("Last backup is %s with date ", label, date)
+//    promlog.Infof("Last backup is %s with date ", label, date)
 
     ch <- prometheus.MustNewConstMetric(e.backupDate, prometheus.CounterValue, val, label)
 
@@ -211,7 +211,7 @@ func (e *Exporter) collectDbAudit(ch chan<- prometheus.Metric) error {
         return fmt.Errorf("Error querying mysql: %v", err)
     }
 
-    log.Infof("Collected last timestamp metric %s", lastAudit)
+    promlog.Infof("Collected last timestamp metric %s", lastAudit)
 
     ch <- prometheus.MustNewConstMetric(e.lastAudit, prometheus.CounterValue, lastAudit, "audit")
 
@@ -243,10 +243,10 @@ func (e *Exporter) collectSymError(ch chan<- prometheus.Metric) error {
     err = stmtOut.QueryRow().Scan(&batchId, &symSQLError)
     if err != nil {
         ch <- prometheus.MustNewConstMetric(e.symError, prometheus.CounterValue, 0, "symdb_out")
-        log.Infof("Error querying mysql for outgoing batch errors: %v", err)
+        promlog.Infof("Error querying mysql for outgoing batch errors: %v", err)
         //return fmt.Errorf("Error querying mysql for outgoing batch errors: %v", err)
     }else{
-        log.Infof("look like there is an error in outgoing batch: %v", batchId)
+        promlog.Infof("look like there is an error in outgoing batch: %v", batchId)
     }
 
     //build a list of string labels (maybe another version of prom?)
@@ -273,10 +273,10 @@ func (e *Exporter) collectSymError(ch chan<- prometheus.Metric) error {
 	    err = stmtIn.QueryRow().Scan(&batchId, &symSQLError)
 	    if err != nil {
 	        ch <- prometheus.MustNewConstMetric(e.symError, prometheus.CounterValue, 0, "symdb_in")
-	        log.Infof("Error querying mysql for incoming batch errors: %v", err)
+	        promlog.Infof("Error querying mysql for incoming batch errors: %v", err)
 	        return fmt.Errorf("Error querying mysql for incoming batch errors: %v", err)
 	    }else{
-	        log.Infof("look like there is an error in incoming batch: %v", batchId)
+	        promlog.Infof("look like there is an error in incoming batch: %v", batchId)
 	    }
 
 		// labels := symSQLError
@@ -287,7 +287,7 @@ func (e *Exporter) collectSymError(ch chan<- prometheus.Metric) error {
 		}
 	}
 
-    log.Infof("Collected symError Metric %s", symError)
+    promlog.Infof("Collected symError Metric %s", symError)
 
     ch <- prometheus.MustNewConstMetric(e.symError, prometheus.CounterValue, symError, labels)
 
@@ -297,7 +297,7 @@ func (e *Exporter) collectSymError(ch chan<- prometheus.Metric) error {
 
 func (e *Exporter) collect(ch chan<- prometheus.Metric) error {
 
-    log.Infof("Starting collecting metrics")
+    promlog.Infof("Starting collecting metrics")
 
     if err := e.collectBackup(ch); err != nil {
         return err
@@ -321,13 +321,13 @@ func (e *Exporter) collect(ch chan<- prometheus.Metric) error {
 
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
-    log.Infof("Locking mutex")
+    promlog.Infof("Locking mutex")
 
     e.mutex.Lock() // To protect metrics from concurrent collects.
     defer e.mutex.Unlock()
     if err := e.collect(ch); err != nil {
     //switched off as might be guilty of halting the container
-//        log.Errorf("Error checking lucypos: %s", err)
+//        promlog.Errorf("Error checking lucypos: %s", err)
     }
     return
 }
@@ -388,13 +388,13 @@ func decodePassword(password []byte) []byte{
 		hexcipher, err := hex.DecodeString(string(cipher[:]))
 	    if err != nil {
 	        // TODO: Properly handle error
-	        log.Fatal(err)
+	        promlog.Fatal(err)
 	    }
 		
 		decoded, err := decrypt(hexcipher, finalkey)
 	    if err != nil {
 	        // TODO: Properly handle error
-	        log.Fatal(err)
+	        promlog.Fatal(err)
 	    }
 	    retstring = decoded
 	}else{
@@ -429,7 +429,7 @@ func main() {
 		myConnectionString.WriteString(")/")	
 		myConnectionString.WriteString(os.Getenv("TPVDB_NAME"))	
 		
-//		log.Info("db connection ", myConnectionString.String())
+//		promlog.Info("db connection ", myConnectionString.String())
 
 		//build symdb connection string
 		var sb strings.Builder
@@ -447,9 +447,9 @@ func main() {
 	    exporter := NewExporter(*backupDirectoryPath, myConnectionString.String(), sb.String())
 	    prometheus.MustRegister(exporter)
 	
-	    log.Infof("Starting Server: ", *listeningAddress)
+	    promlog.Infof("Starting Server: ", *listeningAddress)
 	    http.Handle(*metricsEndpoint, promhttp.Handler())
-	    log.Fatal(http.ListenAndServe(*listeningAddress, nil))
+	    promlog.Fatal(http.ListenAndServe(*listeningAddress, nil))
 	}else{
 		if *mode == "encrypt"{
 			// fun with go, build a key that is specific to the client and 32 bit longs
@@ -461,7 +461,7 @@ func main() {
 			ciphertext, err := encrypt([]byte(*plaintext), finalkey)
 		    if err != nil {
 		        // TODO: Properly handle error
-		        log.Fatal(err)
+		        promlog.Fatal(err)
 		    }
 			fmt.Printf("%s%x", "crypt://", ciphertext)
 		
